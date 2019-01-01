@@ -9,15 +9,21 @@ namespace YoutubeExtractor
     {
         public static string DecipherWithVersion(string cipher, string cipherVersion)
         {
-            string jsUrl = string.Format("http://s.ytimg.com/yts/jsbin/html5player-{0}.js", cipherVersion);
+            string jsUrl = string.Format("http://s.ytimg.com/yts/jsbin/player-{0}.js", cipherVersion);
             string js = HttpHelper.DownloadString(jsUrl);
 
             //Find "C" in this: var A = B.sig||C (B.s)
-            string functNamePattern = @"\.sig\s*\|\|(\w+)\(";
+            string functNamePattern = @"\""signature"",\s?([a-zA-Z0-9\$]+)\("; //Regex Formed To Find Word or DollarSign
+
             var funcName = Regex.Match(js, functNamePattern).Groups[1].Value;
-            string funcBodyPattern = @"(?<brace>{([^{}]| ?(brace))*})";  //Match nested angle braces
-            string funcPattern = string.Format(@"{0}\(\w+\){1}", funcName, funcBodyPattern);
-            var funcBody = Regex.Match(js, funcPattern).Groups["brace"].Value; //Entire sig function
+            
+            if (funcName.Contains("$")) 
+            {
+                funcName = "\\" + funcName; //Due To Dollar Sign Introduction, Need To Escape
+            }
+
+            string funcPattern = @"(?!h\.)" + @funcName + @"=function\(\w+\)\{.*?\}"; //Escape funcName string
+            var funcBody = Regex.Match(js, funcPattern, RegexOptions.Singleline).Value; //Entire sig function
             var lines = funcBody.Split(';'); //Each line in sig function
 
             string idReverse = "", idSlice = "", idCharSwap = ""; //Hold name for each cipher method

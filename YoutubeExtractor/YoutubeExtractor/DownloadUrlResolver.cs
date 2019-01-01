@@ -12,7 +12,7 @@ namespace YoutubeExtractor
     /// </summary>
     public static class DownloadUrlResolver
     {
-        private const int CorrectSignatureLength = 81;
+        private const string RateBypassFlag = "ratebypass";
         private const string SignatureQuery = "signature";
 
         /// <summary>
@@ -202,6 +202,10 @@ namespace YoutubeExtractor
                 url = HttpHelper.UrlDecode(url);
                 url = HttpHelper.UrlDecode(url);
 
+                IDictionary<string, string> parameters = HttpHelper.ParseQueryString(url);
+                if (!parameters.ContainsKey(RateBypassFlag))
+                    url += string.Format("&{0}={1}", RateBypassFlag, "yes");
+
                 yield return new ExtractionInfo { RequiresDecryption = requiresDecryption, Uri = new Uri(url) };
             }
         }
@@ -210,22 +214,23 @@ namespace YoutubeExtractor
         {
             JToken streamMap = json["args"]["adaptive_fmts"];
 
+            // bugfix: adaptive_fmts is missing in some videos, use url_encoded_fmt_stream_map instead
+            if (streamMap == null)
+            {
+              streamMap = json["args"]["url_encoded_fmt_stream_map"];
+            }
+
             return streamMap.ToString();
         }
 
         private static string GetDecipheredSignature(string htmlPlayerVersion, string signature)
         {
-            if (signature.Length == CorrectSignatureLength)
-            {
-                return signature;
-            }
-
             return Decipherer.DecipherWithVersion(signature, htmlPlayerVersion);
         }
 
         private static string GetHtml5PlayerVersion(JObject json)
         {
-            var regex = new Regex(@"html5player-(.+?)\.js");
+            var regex = new Regex(@"player-(.+?).js");
 
             string js = json["assets"]["js"].ToString();
 
